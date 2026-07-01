@@ -15,6 +15,7 @@ export default async function handler(req, res) {
   const FIELDS = ['summary', 'status', 'assignee', 'priority', 'labels', 'updated', 'duedate', 'parent', 'issuetype']
 
   try {
+    // Use GET /rest/api/3/search/jql (new Atlassian endpoint, cursor-based pagination)
     let all = [], nextPageToken = undefined
 
     while (true) {

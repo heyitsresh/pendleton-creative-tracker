@@ -639,6 +639,16 @@ function F26Tab({ edits, setEdits }) {
     debouncedUpsert(asin, patch)
   }
 
+  // Stable key for catalog-sourced pending rows (no ASIN)
+  function pendingKey(name) {
+    return 'f26p_' + (name||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').slice(0,40)
+  }
+  function updateCatalogPending(name, patch) {
+    const key = pendingKey(name)
+    setEdits(prev=>({...prev,[key]:{...(prev[key]||{}),asin:key,...patch}}))
+    debouncedUpsert(key, patch)
+  }
+
   // For manually added new products
   async function updateNewRow(id, patch) {
     setNewProducts(prev => prev.map(r => r.id===id ? {...r,...patch} : r))
@@ -674,81 +684,106 @@ function F26Tab({ edits, setEdits }) {
       <table style={{...S.table, marginBottom:32}}>
         <thead>
           <tr>
-            <th style={{...S.th,width:240}}>Product Name</th>
+            <th style={{...S.th,width:220}}>Product Name</th>
             <th style={{...S.th,width:90}}>Type</th>
             <th style={{...S.th,width:110}}>Launch Date</th>
             <th style={{...S.th,width:90}}>Infographics</th>
             <th style={{...S.th,width:90}}>Copy</th>
             <th style={{...S.th,width:90}}>A+ Content</th>
             <th style={{...S.th,width:150}}>Jira Ticket</th>
+            <th style={{...S.th,width:160}}>Notes</th>
             <th style={{...S.th,width:30}}></th>
           </tr>
         </thead>
         <tbody>
           {allPending.map((r, i) => {
             const isCatalog = r._source === 'catalog'
-            const key = isCatalog ? `cat_${i}` : r.id
+            const rowKey    = isCatalog ? pendingKey(r.name) : r.id
+            const ce        = isCatalog ? (edits[pendingKey(r.name)] || {}) : {}
+
+            // Values: edits override catalog data for catalog rows; manual rows use their own fields
+            const infVal   = isCatalog ? (ce.cr_inf  || r.cr?.inf  || '') : (r.cr_inf  || '')
+            const copyVal  = isCatalog ? (ce.cr_copy || r.cr?.copy || '') : (r.cr_copy || '')
+            const aplusVal = isCatalog ? (ce.cr_aplus|| r.cr?.aplus|| '') : (r.cr_aplus|| '')
+            const jiraVal  = isCatalog ? (ce.jira_ticket || r.jira?.epic || '') : (r.jira_ticket || '')
+            const notesVal = isCatalog ? (ce.notes || '') : (r.notes || '')
+
+            function onInf(v)   { isCatalog ? updateCatalogPending(r.name,{cr_inf:v})   : updateNewRow(r.id,{cr_inf:v})   }
+            function onCopy(v)  { isCatalog ? updateCatalogPending(r.name,{cr_copy:v})  : updateNewRow(r.id,{cr_copy:v})  }
+            function onAplus(v) { isCatalog ? updateCatalogPending(r.name,{cr_aplus:v}) : updateNewRow(r.id,{cr_aplus:v}) }
+            function onJira(v)  { isCatalog ? updateCatalogPending(r.name,{jira_ticket:v}) : updateNewRow(r.id,{jira_ticket:v}) }
+            function onNotes(v) { isCatalog ? updateCatalogPending(r.name,{notes:v})    : updateNewRow(r.id,{notes:v})    }
+
             return (
-              <tr key={key} className="p-row" style={S.pRow}>
+              <tr key={rowKey} className="p-row" style={S.pRow}>
                 <td style={{...S.td,fontWeight:600}}>{r.name||'—'}</td>
+
+                {/* Type */}
                 <td style={S.td}>
                   {isCatalog ? (
-                    <span style={{display:'inline-block',borderRadius:10,padding:'2px 8px',fontSize:10,fontWeight:700,background:r.type==='New Towel'?'#fef3c7':'#ede9fe',color:r.type==='New Towel'?'#92400e':'#6d28d9'}}>{r.type}</span>
+                    <span style={{display:'inline-block',borderRadius:10,padding:'2px 8px',fontSize:10,fontWeight:700,
+                      background:r.type==='New Towel'?'#fef3c7':'#ede9fe',
+                      color:r.type==='New Towel'?'#92400e':'#6d28d9'}}>{r.type}</span>
                   ) : (
                     <select value={r.type||'New Style'} onChange={ev=>updateNewRow(r.id,{type:ev.target.value})} style={S.crSelect}>
                       {TYPE_OPTIONS.map(o=><option key={o} value={o}>{o}</option>)}
                     </select>
                   )}
                 </td>
+
+                {/* Launch Date */}
                 <td style={{...S.td,fontSize:11}}>
                   {isCatalog ? (r.launch||'—') : (
                     <input type="date" value={r.launch_date||''} onChange={ev=>updateNewRow(r.id,{launch_date:ev.target.value})}
                       style={{...S.inlineSelect,width:120}} />
                   )}
                 </td>
+
                 {/* Inf */}
                 <td style={S.td}>
-                  <select value={isCatalog?(r.cr?.inf||''):(r.cr_inf||'')}
-                    onChange={ev=>isCatalog?null:updateNewRow(r.id,{cr_inf:ev.target.value})}
-                    disabled={isCatalog && !!r.cr?.inf}
-                    style={{...S.crSelect,...(((isCatalog?r.cr?.inf:r.cr_inf))?(CR_COLORS[isCatalog?r.cr?.inf:r.cr_inf]||{}):{}),...(isCatalog&&r.cr?.inf?{background:CR_COLORS[r.cr.inf]?.bg,color:CR_COLORS[r.cr.inf]?.color,fontWeight:700}:{})}}>
+                  <select value={infVal} onChange={ev=>onInf(ev.target.value)}
+                    style={{...S.crSelect,...(CR_COLORS[infVal]?{background:CR_COLORS[infVal].bg,color:CR_COLORS[infVal].color,fontWeight:700}:{})}}>
                     <option value="">Inf…</option>
                     {CR_OPTS.filter(Boolean).map(o=><option key={o} value={o}>{o}</option>)}
                   </select>
                 </td>
+
                 {/* Copy */}
                 <td style={S.td}>
-                  <select value={isCatalog?(r.cr?.copy||''):(r.cr_copy||'')}
-                    onChange={ev=>isCatalog?null:updateNewRow(r.id,{cr_copy:ev.target.value})}
-                    disabled={isCatalog && !!r.cr?.copy}
-                    style={{...S.crSelect,...(isCatalog&&r.cr?.copy?{background:CR_COLORS[r.cr.copy]?.bg,color:CR_COLORS[r.cr.copy]?.color,fontWeight:700}:{})}}>
+                  <select value={copyVal} onChange={ev=>onCopy(ev.target.value)}
+                    style={{...S.crSelect,...(CR_COLORS[copyVal]?{background:CR_COLORS[copyVal].bg,color:CR_COLORS[copyVal].color,fontWeight:700}:{})}}>
                     <option value="">Copy…</option>
                     {CR_OPTS.filter(Boolean).map(o=><option key={o} value={o}>{o}</option>)}
                   </select>
                 </td>
+
                 {/* A+ */}
                 <td style={S.td}>
-                  <select value={isCatalog?(r.cr?.aplus||''):(r.cr_aplus||'')}
-                    onChange={ev=>isCatalog?null:updateNewRow(r.id,{cr_aplus:ev.target.value})}
-                    disabled={isCatalog && !!r.cr?.aplus}
-                    style={{...S.crSelect,...(isCatalog&&r.cr?.aplus?{background:CR_COLORS[r.cr.aplus]?.bg,color:CR_COLORS[r.cr.aplus]?.color,fontWeight:700}:{})}}>
+                  <select value={aplusVal} onChange={ev=>onAplus(ev.target.value)}
+                    style={{...S.crSelect,...(CR_COLORS[aplusVal]?{background:CR_COLORS[aplusVal].bg,color:CR_COLORS[aplusVal].color,fontWeight:700}:{})}}>
                     <option value="">A+…</option>
                     {CR_OPTS.filter(Boolean).map(o=><option key={o} value={o}>{o}</option>)}
                   </select>
                 </td>
+
                 {/* Jira */}
                 <td style={S.td}>
-                  {isCatalog ? (
-                    r.jira?.epic ? <JiraLink ticket={r.jira.epic} /> : '—'
-                  ) : (
-                    <div style={{display:'flex',gap:4,alignItems:'center'}}>
-                      <input placeholder="e.g. CREATE-123" value={r.jira_ticket||''}
-                        onChange={ev=>updateNewRow(r.id,{jira_ticket:ev.target.value})}
-                        style={{...S.inlineSelect,width:110}} />
-                      {r.jira_ticket && <JiraLink ticket={r.jira_ticket} />}
-                    </div>
-                  )}
+                  <div style={{display:'flex',gap:4,alignItems:'center'}}>
+                    <input placeholder="CREATE-123" value={jiraVal}
+                      onChange={ev=>onJira(ev.target.value)}
+                      style={{...S.inlineSelect,width:100}} />
+                    {jiraVal && <JiraLink ticket={jiraVal} />}
+                  </div>
                 </td>
+
+                {/* Notes */}
+                <td style={S.td}>
+                  <textarea value={notesVal} placeholder="Note…" rows={1}
+                    onChange={ev=>onNotes(ev.target.value)}
+                    className="note-area" style={S.noteArea} />
+                </td>
+
+                {/* Delete (manual only) */}
                 <td style={{...S.td,textAlign:'center'}}>
                   {!isCatalog && (
                     <button onClick={()=>deleteRow(r.id)} style={{border:'none',background:'none',color:'#e5e7eb',cursor:'pointer',fontSize:14}} title="Delete">✕</button>
@@ -777,7 +812,8 @@ function F26Tab({ edits, setEdits }) {
               <td style={S.td}><select value={newRow.cr_inf} onChange={e=>setNewRow(p=>({...p,cr_inf:e.target.value}))} style={S.crSelect}>{CR_OPTS.map(o=><option key={o} value={o}>{o||'Inf…'}</option>)}</select></td>
               <td style={S.td}><select value={newRow.cr_copy} onChange={e=>setNewRow(p=>({...p,cr_copy:e.target.value}))} style={S.crSelect}>{CR_OPTS.map(o=><option key={o} value={o}>{o||'Copy…'}</option>)}</select></td>
               <td style={S.td}><select value={newRow.cr_aplus} onChange={e=>setNewRow(p=>({...p,cr_aplus:e.target.value}))} style={S.crSelect}>{CR_OPTS.map(o=><option key={o} value={o}>{o||'A+…'}</option>)}</select></td>
-              <td style={S.td}><input placeholder="CREATE-123" value={newRow.jira_ticket} onChange={e=>setNewRow(p=>({...p,jira_ticket:e.target.value}))} style={{...S.inlineSelect,width:110}} /></td>
+              <td style={S.td}><input placeholder="CREATE-123" value={newRow.jira_ticket} onChange={e=>setNewRow(p=>({...p,jira_ticket:e.target.value}))} style={{...S.inlineSelect,width:100}} /></td>
+              <td style={S.td}><textarea placeholder="Note…" rows={1} value={newRow.notes||''} onChange={e=>setNewRow(p=>({...p,notes:e.target.value}))} style={S.noteArea} /></td>
               <td style={{...S.td,textAlign:'center'}}>
                 <div style={{display:'flex',gap:4}}>
                   <button onClick={submitNewRow} style={{...S.btnBlue,padding:'3px 8px',fontSize:11}}>✓</button>
@@ -788,7 +824,7 @@ function F26Tab({ edits, setEdits }) {
           )}
 
           {allPending.length === 0 && !addingRow && (
-            <tr><td colSpan={8} style={{padding:20,textAlign:'center',color:'#aaa',fontSize:12}}>No pending items — click + Add Product to add one</td></tr>
+            <tr><td colSpan={9} style={{padding:20,textAlign:'center',color:'#aaa',fontSize:12}}>No pending items — click + Add Product to add one</td></tr>
           )}
         </tbody>
       </table>
