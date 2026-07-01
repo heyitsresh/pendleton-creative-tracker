@@ -35,10 +35,16 @@ function Check({ ok }) {
 }
 function JiraLink({ ticket }) {
   if (!ticket) return null
+  const [hov, setHov] = useState(false)
   return (
-    <a href={`https://avenue7media.atlassian.net/browse/${ticket}`} target="_blank" rel="noreferrer"
-      style={{ background:'#e0e7ff', color:'#3730a3', borderRadius:4, padding:'2px 6px', fontSize:10, fontWeight:600, textDecoration:'none', display:'inline-block' }}>
-      {ticket}
+    <a href={`https://ave7.atlassian.net/browse/${ticket}`} target="_blank" rel="noreferrer"
+      onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+      style={{ background: hov ? '#fff' : '#4f46e5', color: hov ? '#4f46e5' : '#fff',
+        border: '1.5px solid #4f46e5',
+        borderRadius:5, padding:'3px 8px', fontSize:10, fontWeight:700, textDecoration:'none',
+        display:'inline-flex', alignItems:'center', gap:4, transition:'all .15s',
+        boxShadow: hov ? '0 2px 8px rgba(79,70,229,.2)' : 'none', whiteSpace:'nowrap' }}>
+      🔗 {ticket}
     </a>
   )
 }
@@ -250,7 +256,7 @@ function CategorySidebar({ cats, products, catFilter, setCatFilter }) {
         width: open ? 196 : 46, minHeight:'100%',
         background:'#0f172a', transition:'width .2s ease',
         overflow:'hidden', flexShrink:0,
-        position:'sticky', top:112, alignSelf:'flex-start',
+        position:'sticky', top:58, alignSelf:'flex-start',
         borderRight:'1px solid rgba(255,255,255,.06)', zIndex:70,
       }}
     >
@@ -276,6 +282,92 @@ function CategorySidebar({ cats, products, catFilter, setCatFilter }) {
           {open && <><span style={{flex:1}}>{c}</span><span style={{fontSize:10,color:'#6366f1',fontWeight:800}}>{counts[c]||0}</span></>}
         </div>
       ))}
+    </div>
+  )
+}
+
+// ── Nav Sidebar ──────────────────────────────────────────────────────────────
+const OWNER_COLORS = { Resh:'#6366f1', Sheila:'#0ea5e9', Vannessa:'#10b981', Catalog:'#f59e0b' }
+
+function NavSidebar({ tab, setTab, ownerCounts, loading, lastSync }) {
+  const [open, setOpen] = useState(false)
+  const TABS = [
+    { id:'master',   icon:'📋', label:'Master Catalog' },
+    { id:'f26',      icon:'📦', label:'F26 Launches' },
+    { id:'creative', icon:'🎨', label:'Creative Tracker' },
+    { id:'jira',     icon:'🎫', label:'Jira Tasks' },
+  ]
+  return (
+    <div onMouseEnter={()=>setOpen(true)} onMouseLeave={()=>setOpen(false)}
+      style={{ width:open?210:52, background:'linear-gradient(180deg,#0f172a 0%,#1e1b4b 100%)',
+        display:'flex', flexDirection:'column', flexShrink:0,
+        position:'sticky', top:0, height:'100vh', overflow:'hidden',
+        transition:'width .2s ease', zIndex:100,
+        borderRight:'1px solid rgba(255,255,255,.06)',
+        boxShadow:'4px 0 20px rgba(0,0,0,.25)' }}>
+
+      {/* Logo */}
+      <div style={{ padding:'18px 13px 14px', borderBottom:'1px solid rgba(255,255,255,.06)',
+        display:'flex', alignItems:'center', gap:10, whiteSpace:'nowrap', overflow:'hidden' }}>
+        <div style={{ width:26, height:26, borderRadius:7, flexShrink:0,
+          background:'linear-gradient(135deg,#818cf8,#6366f1)',
+          display:'flex', alignItems:'center', justifyContent:'center', fontSize:14 }}>⛵</div>
+        {open && <div>
+          <div style={{ fontWeight:800, fontSize:12, color:'#fff', letterSpacing:'.3px' }}>Pendleton</div>
+          <div style={{ fontSize:9, color:'rgba(255,255,255,.38)' }}>Avenue7 Media</div>
+        </div>}
+      </div>
+
+      {/* Nav items */}
+      <div style={{ flex:1, padding:'10px 0' }}>
+        {TABS.map(t=>(
+          <div key={t.id} onClick={()=>setTab(t.id)}
+            style={{ display:'flex', alignItems:'center', gap:10,
+              padding:'11px 13px', cursor:'pointer',
+              whiteSpace:'nowrap', overflow:'hidden',
+              background: tab===t.id ? 'rgba(99,102,241,.18)' : 'transparent',
+              borderLeft:`3px solid ${tab===t.id?'#6366f1':'transparent'}`,
+              color: tab===t.id ? '#c7d2fe' : '#64748b',
+              fontWeight:600, fontSize:12, transition:'all .15s' }}>
+            <span style={{ fontSize:15, flexShrink:0 }}>{t.icon}</span>
+            {open && <span>{t.label}</span>}
+          </div>
+        ))}
+      </div>
+
+      {/* Owner task counts */}
+      <div style={{ borderTop:'1px solid rgba(255,255,255,.06)', padding:'10px 0' }}>
+        {open && <div style={{ fontSize:9, color:'rgba(255,255,255,.28)', fontWeight:700,
+          letterSpacing:'1px', textTransform:'uppercase', padding:'0 13px 8px' }}>Team Open Tasks</div>}
+        {['Resh','Sheila','Vannessa','Catalog'].map(name=>{
+          const count = ownerCounts[name]||0
+          const color = OWNER_COLORS[name]
+          return (
+            <div key={name} style={{ display:'flex', alignItems:'center', gap:10,
+              padding:open?'5px 13px':'6px 13px', whiteSpace:'nowrap', overflow:'hidden' }}>
+              <div style={{ width:26, height:26, borderRadius:'50%', background:color,
+                display:'flex', alignItems:'center', justifyContent:'center',
+                fontSize:10, fontWeight:800, color:'#fff', flexShrink:0 }}>{name[0]}</div>
+              {open && <>
+                <span style={{ fontSize:11, color:'#94a3b8', flex:1 }}>{name}</span>
+                <span style={{ fontSize:12, fontWeight:800, color:count>0?'#fbbf24':'#475569',
+                  background:count>0?'rgba(251,191,36,.12)':'transparent',
+                  borderRadius:10, padding:'1px 7px', minWidth:24, textAlign:'center' }}>{count}</span>
+              </>}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Sync status */}
+      <div style={{ padding:'10px 13px', borderTop:'1px solid rgba(255,255,255,.06)',
+        display:'flex', alignItems:'center', gap:8, overflow:'hidden', whiteSpace:'nowrap' }}>
+        <span style={{ width:7, height:7, borderRadius:'50%', flexShrink:0,
+          background:loading?'#fbbf24':'#4ade80', boxShadow:loading?'none':'0 0 6px #4ade80' }} />
+        {open && <span style={{ fontSize:10, color:'#475569' }}>
+          {loading ? 'Loading…' : `Synced ${lastSync}`}
+        </span>}
+      </div>
     </div>
   )
 }
@@ -869,7 +961,7 @@ function CreativeTab({ edits, setEdits, onOpenPanel }) {
                     style={{...S.crSelect,minWidth:88,fontWeight:e.owner?700:400,
                       background:e.owner?'#f5f3ff':'#fafafa',color:e.owner?'#6d28d9':'#94a3b8'}}>
                     <option value="">—</option>
-                    {['Resh','Sheila','Vannessa'].map(o=><option key={o} value={o}>{o}</option>)}
+                    {['Resh','Sheila','Vannessa','Catalog'].map(o=><option key={o} value={o}>{o}</option>)}
                   </select>
                 </td>
                 <td style={S.td}>
@@ -898,7 +990,392 @@ function CreativeTab({ edits, setEdits, onOpenPanel }) {
   )
 }
 
-const OWNERS = ['Unassigned', 'Resh', 'Sheila', 'Vannessa']
+// ── Jira Tab ──────────────────────────────────────────────────────────────────
+const JIRA_STATUS_STYLE = {
+  'To Do':       { bg:'#e0e7ff', color:'#3730a3' },
+  'In Progress': { bg:'#fef9c3', color:'#854d0e' },
+  'Uploading':   { bg:'#fed7aa', color:'#9a3412' },
+  'Internal QA': { bg:'#f3e8ff', color:'#6b21a8' },
+  'Client QA':   { bg:'#fce7f3', color:'#9d174d' },
+  'In Review':   { bg:'#dbeafe', color:'#1e40af' },
+}
+const JIRA_PRIORITY_COLOR = { Urgent:'#ef4444', Highest:'#ef4444', High:'#f97316', Medium:'#6366f1', Low:'#94a3b8', Lowest:'#cbd5e1' }
+const JIRA_ASSIGNEE_COLORS = {
+  'Reshma Tahilramani': '#6366f1',
+  'Shiela Macapagal':   '#0ea5e9',
+  'Vannessa Pinlac':    '#10b981',
+  'Unassigned':         '#cbd5e1',
+}
+const JIRA_CHART_COLORS = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#ec4899','#8b5cf6','#f43f5e','#14b8a6','#84cc16','#06b6d4']
+const JIRA_SHORT = { 'Reshma Tahilramani':'Resh', 'Shiela Macapagal':'Sheila', 'Vannessa Pinlac':'Vannessa' }
+
+function jiraDueBucket(dateStr) {
+  if (!dateStr) return 'none'
+  const now = new Date(); now.setHours(0,0,0,0)
+  const d   = new Date(dateStr); d.setHours(0,0,0,0)
+  const endWeek = new Date(now); endWeek.setDate(now.getDate() + (7 - now.getDay()))
+  const endNext = new Date(endWeek); endNext.setDate(endWeek.getDate() + 7)
+  if (d < now)        return 'overdue'
+  if (d <= endWeek)   return 'week'
+  if (d <= endNext)   return 'next'
+  return 'later'
+}
+
+function JiraHBar({ data, colorFn }) {
+  const max = Math.max(...data.map(d => d.value), 1)
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
+      {data.map((d, i) => (
+        <div key={i} style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <div style={{ width:110, fontSize:10, color:'#64748b', fontWeight:600, textAlign:'right',
+            flexShrink:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}
+            title={d.label}>{d.label}</div>
+          <div style={{ flex:1, background:'#f1f5f9', borderRadius:99, height:10, overflow:'hidden' }}>
+            <div style={{ width:`${(d.value/max)*100}%`, height:10, borderRadius:99,
+              background: colorFn ? colorFn(d.label, i) : JIRA_CHART_COLORS[i % JIRA_CHART_COLORS.length],
+              transition:'width .4s ease' }} />
+          </div>
+          <div style={{ width:28, fontSize:11, fontWeight:700, color:'#0f172a', textAlign:'right', flexShrink:0 }}>{d.value}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function JiraTab() {
+  const [issues,    setIssues]   = useState([])
+  const [jLoading,  setJLoading] = useState(true)
+  const [jError,    setJError]   = useState(null)
+  const [jView,     setJView]    = useState('dashboard')
+  const [jSearch,   setJSearch]  = useState('')
+  const [jFStatus,  setJFStatus] = useState('')
+  const [jFAssign,  setJFAssign] = useState('')
+  const [jFDue,     setJFDue]    = useState('')
+  const [jSortKey,  setJSortKey] = useState('updated')
+  const [jSortDir,  setJSortDir] = useState(-1)
+
+  useEffect(() => { loadJira() }, [])
+
+  async function loadJira() {
+    setJLoading(true); setJError(null)
+    try {
+      const res = await fetch('/api/jira')
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || res.statusText)
+      setIssues(data.map(i => ({ ...i, dueBucket: jiraDueBucket(i.duedate) })))
+    } catch(e) { setJError(e.message) }
+    finally    { setJLoading(false) }
+  }
+
+  if (jLoading) return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', padding:80, color:'#94a3b8' }}>
+      <div style={{ textAlign:'center' }}>
+        <div style={{ fontSize:32, lineHeight:1 }}>⏳</div>
+        <div style={{ marginTop:14, fontSize:13 }}>Loading Jira tasks…</div>
+        <div style={{ marginTop:6, fontSize:11, color:'#cbd5e1' }}>Fetching all open Pendleton tasks</div>
+      </div>
+    </div>
+  )
+
+  if (jError) return (
+    <div style={{ padding:24 }}>
+      <div style={{ background:'#fee2e2', color:'#991b1b', borderRadius:10, padding:'16px 20px', fontSize:12, lineHeight:1.6 }}>
+        <div style={{ fontWeight:800, marginBottom:6 }}>⚠️ Could not load Jira tasks</div>
+        {jError.includes('JIRA_')
+          ? 'Add JIRA_EMAIL and JIRA_API_TOKEN to Vercel → Settings → Environment Variables, then redeploy.'
+          : jError}
+      </div>
+    </div>
+  )
+
+  // ── Aggregates ──
+  const total    = issues.length
+  const inprog   = issues.filter(i => i.statusCat === 'In Progress').length
+  const todo     = issues.filter(i => i.statusCat === 'To Do').length
+  const overdue  = issues.filter(i => i.dueBucket === 'overdue').length
+
+  const countBy = (key) => issues.reduce((acc, i) => {
+    const v = i[key] || '—'; acc[v] = (acc[v]||0)+1; return acc
+  }, {})
+  const aMap  = countBy('assignee')
+  const stMap = countBy('status')
+  const prMap = countBy('priority')
+  const pMap  = issues.reduce((acc, i) => {
+    const k = i.parentSum||'(no parent)'; acc[k] = (acc[k]||0)+1; return acc
+  }, {})
+  const dueBuckets = issues.reduce((acc,i)=>{ acc[i.dueBucket]=(acc[i.dueBucket]||0)+1; return acc },{})
+
+  const toBarData = (map, order) => {
+    const keys = order ? order.filter(k=>map[k]) : Object.keys(map).sort((a,b)=>map[b]-map[a])
+    return keys.map(label => ({ label, value: map[label]||0 }))
+  }
+
+  const assigneeData = toBarData(aMap)
+  const statusData   = toBarData(stMap)
+  const priorityData = toBarData(prMap, ['Urgent','Highest','High','Medium','Low','Lowest'])
+  const parentData   = Object.entries(pMap).sort(([,a],[,b])=>b-a).slice(0,14).map(([label,value])=>({label,value}))
+  const dueData      = [
+    { label:'Overdue',    value:dueBuckets.overdue||0, color:'#ef4444' },
+    { label:'This Week',  value:dueBuckets.week||0,    color:'#f97316' },
+    { label:'Next Week',  value:dueBuckets.next||0,    color:'#f59e0b' },
+    { label:'Later',      value:dueBuckets.later||0,   color:'#6366f1' },
+    { label:'No Due Date',value:dueBuckets.none||0,    color:'#cbd5e1' },
+  ].filter(d=>d.value>0)
+
+  const statuses  = [...new Set(issues.map(i=>i.status))].sort()
+  const assignees = [...new Set(issues.map(i=>i.assignee))].sort()
+
+  // ── Filtered / sorted table ──
+  const jFiltered = issues.filter(i => {
+    const q = jSearch.toLowerCase()
+    if (q && !`${i.key} ${i.summary} ${i.assignee} ${i.parentSum}`.toLowerCase().includes(q)) return false
+    if (jFStatus && i.status   !== jFStatus) return false
+    if (jFAssign && i.assignee !== jFAssign) return false
+    if (jFDue    && i.dueBucket !== jFDue)   return false
+    return true
+  }).sort((a,b) => {
+    const av = a[jSortKey]||'', bv = b[jSortKey]||''
+    return av < bv ? -jSortDir : av > bv ? jSortDir : 0
+  })
+
+  function jSortBy(key) {
+    if (jSortKey === key) setJSortDir(d => d*-1)
+    else { setJSortKey(key); setJSortDir(1) }
+  }
+
+  const card = { background:'#fff', borderRadius:12, boxShadow:'0 2px 12px rgba(0,0,0,.07)', overflow:'hidden', marginBottom:14 }
+  const cardH = { padding:'12px 16px 8px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'center', justifyContent:'space-between' }
+  const cardT = { fontSize:11, fontWeight:800, color:'#0f172a', textTransform:'uppercase', letterSpacing:'.5px' }
+
+  return (
+    <div>
+      {/* Inner stats bar */}
+      <div style={{ background:'#fff', borderBottom:'1px solid #e2e8f0', padding:'10px 24px',
+        display:'flex', gap:10, flexWrap:'wrap', alignItems:'center',
+        position:'sticky', top:0, zIndex:80, boxShadow:'0 1px 4px rgba(0,0,0,.04)' }}>
+        {[
+          { v:total,   l:'Open Tasks',  c:'#6366f1' },
+          { v:inprog,  l:'In Progress', c:'#f59e0b' },
+          { v:todo,    l:'To Do',       c:'#64748b' },
+          { v:overdue, l:'Overdue',     c:'#ef4444', warn:overdue>0 },
+          { v:aMap['Reshma Tahilramani']||0,  l:'Resh',      c:'#6366f1' },
+          { v:aMap['Shiela Macapagal']||0,    l:'Sheila',    c:'#0ea5e9' },
+          { v:aMap['Vannessa Pinlac']||0,     l:'Vannessa',  c:'#10b981' },
+          { v:aMap['Unassigned']||0,          l:'Unassigned',c:'#94a3b8' },
+        ].map(({v,l,c,warn})=>(
+          <div key={l} className="stat-card" style={{ background:warn?'#fff5f5':'#fff', borderRadius:10,
+            padding:'8px 14px', textAlign:'center', borderLeft:`3px solid ${c}`,
+            boxShadow:'0 1px 6px rgba(0,0,0,.07)', minWidth:76 }}>
+            <div style={{ fontSize:20, fontWeight:800, color:warn?'#ef4444':'#0f172a', lineHeight:1 }}>{v}</div>
+            <div style={{ fontSize:9, color:'#94a3b8', marginTop:2, fontWeight:600,
+              textTransform:'uppercase', letterSpacing:'.4px', whiteSpace:'nowrap' }}>{l}</div>
+          </div>
+        ))}
+        <div style={{flex:1}} />
+        <button onClick={loadJira} style={S.btnGray}>↻ Refresh</button>
+      </div>
+
+      {/* View toggle */}
+      <div style={{ background:'#fff', borderBottom:'1px solid #e2e8f0', padding:'0 24px', display:'flex' }}>
+        {[['dashboard','📊 Dashboard'],['table','📋 All Tasks']].map(([id,label])=>(
+          <button key={id} onClick={()=>setJView(id)}
+            style={{ border:'none', borderBottom:`2px solid ${jView===id?'#6366f1':'transparent'}`,
+              background:'none', padding:'10px 18px', fontSize:12, fontWeight:600,
+              color:jView===id?'#6366f1':'#64748b', cursor:'pointer', transition:'all .15s' }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Dashboard ── */}
+      {jView === 'dashboard' && (
+        <div style={{ padding:'16px 24px 32px' }}>
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:14 }}>
+            <div style={card}>
+              <div style={cardH}><span style={cardT}>👥 By Assignee</span><span style={{fontSize:10,color:'#94a3b8'}}>who owns what</span></div>
+              <div style={{padding:16}}><JiraHBar data={assigneeData} colorFn={l=>JIRA_ASSIGNEE_COLORS[l]||'#6366f1'} /></div>
+            </div>
+            <div style={card}>
+              <div style={cardH}><span style={cardT}>🔵 By Status</span><span style={{fontSize:10,color:'#94a3b8'}}>workflow stage</span></div>
+              <div style={{padding:16}}><JiraHBar data={statusData} colorFn={l=>{const s=JIRA_STATUS_STYLE[l]; return s?s.color:'#94a3b8'}} /></div>
+            </div>
+          </div>
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:14 }}>
+            <div style={card}>
+              <div style={cardH}><span style={cardT}>🚨 By Priority</span><span style={{fontSize:10,color:'#94a3b8'}}>urgency breakdown</span></div>
+              <div style={{padding:16}}><JiraHBar data={priorityData} colorFn={l=>JIRA_PRIORITY_COLOR[l]||'#94a3b8'} /></div>
+            </div>
+            <div style={card}>
+              <div style={cardH}><span style={cardT}>📅 Due Date Buckets</span><span style={{fontSize:10,color:'#94a3b8'}}>when tasks are due</span></div>
+              <div style={{padding:16}}><JiraHBar data={dueData} colorFn={(_,i)=>dueData[i]?.color||'#94a3b8'} /></div>
+            </div>
+          </div>
+
+          {/* Assignee breakdown table */}
+          <div style={{...card, marginBottom:14}}>
+            <div style={cardH}><span style={cardT}>📋 Assignee Breakdown</span><span style={{fontSize:10,color:'#94a3b8'}}>tasks per person by status</span></div>
+            <div style={{padding:'12px 16px'}}>
+              <table style={{width:'100%', borderCollapse:'collapse', fontSize:12}}>
+                <thead>
+                  <tr>{['Assignee','Tasks','Share','By Status'].map(h=>(
+                    <th key={h} style={{fontSize:9,fontWeight:700,textTransform:'uppercase',letterSpacing:'.5px',
+                      color:'#94a3b8',padding:'4px 8px 6px',textAlign:'left'}}>{h}</th>
+                  ))}</tr>
+                </thead>
+                <tbody>
+                  {assigneeData.map(({label,value})=>{
+                    const color = JIRA_ASSIGNEE_COLORS[label]||'#6366f1'
+                    const init  = label.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
+                    const short = JIRA_SHORT[label] || label.split(' ')[0]
+                    const pct   = Math.round(value/total*100)
+                    const byStatus = statuses.map(s=>{
+                      const n = issues.filter(i=>i.assignee===label&&i.status===s).length
+                      if (!n) return null
+                      const ss = JIRA_STATUS_STYLE[s]||{bg:'#f1f5f9',color:'#64748b'}
+                      return <span key={s} style={{display:'inline-block',background:ss.bg,color:ss.color,
+                        borderRadius:4,padding:'1px 6px',fontSize:10,fontWeight:700,margin:1}}>{s} ({n})</span>
+                    })
+                    return (
+                      <tr key={label} style={{borderTop:'1px solid #f1f5f9'}}>
+                        <td style={{padding:'6px 8px'}}>
+                          <div style={{display:'flex',alignItems:'center',gap:8}}>
+                            <div style={{width:22,height:22,borderRadius:'50%',background:color,
+                              display:'flex',alignItems:'center',justifyContent:'center',
+                              fontSize:9,fontWeight:800,color:'#fff',flexShrink:0}}>{init}</div>
+                            {short}
+                          </div>
+                        </td>
+                        <td style={{padding:'6px 8px',fontWeight:700}}>{value}</td>
+                        <td style={{padding:'6px 8px',minWidth:130}}>
+                          <div style={{display:'flex',alignItems:'center',gap:6}}>
+                            <div style={{flex:1,background:'#f1f5f9',borderRadius:99,height:6,overflow:'hidden'}}>
+                              <div style={{width:`${pct}%`,height:6,borderRadius:99,background:color,transition:'width .4s'}} />
+                            </div>
+                            <span style={{fontSize:10,color:'#94a3b8',width:30,textAlign:'right'}}>{pct}%</span>
+                          </div>
+                        </td>
+                        <td style={{padding:'6px 8px'}}>{byStatus}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* By parent / epic */}
+          <div style={card}>
+            <div style={cardH}><span style={cardT}>🗂️ Tasks by Parent / Epic</span><span style={{fontSize:10,color:'#94a3b8'}}>top 14 parents by count</span></div>
+            <div style={{padding:16}}><JiraHBar data={parentData} /></div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Table ── */}
+      {jView === 'table' && (
+        <div>
+          <div style={{...S.toolbar, top:98, zIndex:70}}>
+            <input placeholder="🔍 Search ticket, summary, assignee…" value={jSearch}
+              onChange={e=>setJSearch(e.target.value)} className="toolbar-input"
+              style={{...S.searchBox, width:260}} />
+            <select value={jFStatus} onChange={e=>setJFStatus(e.target.value)} style={S.sel}>
+              <option value="">All Statuses</option>
+              {statuses.map(s=><option key={s}>{s}</option>)}
+            </select>
+            <select value={jFAssign} onChange={e=>setJFAssign(e.target.value)} style={S.sel}>
+              <option value="">All Assignees</option>
+              {assignees.map(a=><option key={a}>{a}</option>)}
+            </select>
+            <select value={jFDue} onChange={e=>setJFDue(e.target.value)} style={S.sel}>
+              <option value="">All Due Dates</option>
+              <option value="overdue">Overdue</option>
+              <option value="week">This Week</option>
+              <option value="next">Next Week</option>
+              <option value="later">Later</option>
+              <option value="none">No Due Date</option>
+            </select>
+            <span style={{fontSize:11,color:'#94a3b8',marginLeft:'auto'}}>{jFiltered.length} of {total} tasks</span>
+          </div>
+          <div style={{padding:'16px 24px 32px', overflowX:'auto'}}>
+            <table style={{...S.table, minWidth:900}}>
+              <thead>
+                <tr>
+                  {[['key','Ticket'],['summary','Summary'],['parentSum','Parent'],
+                    ['status','Status'],['assignee','Assignee'],['priority','Priority'],
+                    ['duedate','Due Date'],['updated','Updated']
+                  ].map(([k,label])=>(
+                    <th key={k} style={{...S.th, cursor:'pointer'}} onClick={()=>jSortBy(k)}>
+                      {label}{jSortKey===k?(jSortDir===1?' ↑':' ↓'):''}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {jFiltered.length === 0
+                  ? <tr><td colSpan={8} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>No tasks match</td></tr>
+                  : jFiltered.map(i => {
+                    const ss    = JIRA_STATUS_STYLE[i.status]||{bg:'#f1f5f9',color:'#64748b'}
+                    const pdot  = JIRA_PRIORITY_COLOR[i.priority]||'#94a3b8'
+                    const init  = i.assignee.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
+                    const short = JIRA_SHORT[i.assignee]||i.assignee.split(' ')[0]
+                    const acol  = JIRA_ASSIGNEE_COLORS[i.assignee]||'#6366f1'
+                    const upd   = i.updated ? new Date(i.updated).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '—'
+                    const DUE_BG = {overdue:'#fee2e2',week:'#fef9c3',next:'#e0f2fe',later:'#f0fdf4',none:'#f1f5f9'}
+                    const DUE_TX = {overdue:'#991b1b',week:'#92400e',next:'#0c4a6e',later:'#14532d',none:'#94a3b8'}
+                    const dueEl = i.duedate
+                      ? <span style={{background:DUE_BG[i.dueBucket],color:DUE_TX[i.dueBucket],borderRadius:5,
+                          padding:'2px 7px',fontSize:10,fontWeight:700}}>
+                          {new Date(i.duedate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'})}
+                        </span>
+                      : <span style={{color:'#cbd5e1'}}>—</span>
+                    return (
+                      <tr key={i.key} className="p-row">
+                        <td>
+                          <a href={i.url} target="_blank" rel="noreferrer"
+                            style={{color:'#6366f1',textDecoration:'none',fontFamily:'monospace',fontSize:11,fontWeight:700,
+                              border:'1.5px solid #6366f1',borderRadius:5,padding:'2px 7px',
+                              display:'inline-flex',alignItems:'center',gap:4,transition:'all .15s'}}
+                            onMouseEnter={e=>{e.currentTarget.style.background='#6366f1';e.currentTarget.style.color='#fff'}}
+                            onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='#6366f1'}}>
+                            🔗 {i.key}
+                          </a>
+                        </td>
+                        <td style={{maxWidth:260,fontWeight:500,fontSize:12,lineHeight:1.35}}>{i.summary}</td>
+                        <td style={{color:'#64748b',fontSize:11,maxWidth:140,overflow:'hidden',
+                          textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={i.parentSum}>{i.parentSum||'—'}</td>
+                        <td><span style={{display:'inline-block',borderRadius:5,padding:'3px 8px',fontSize:10,
+                          fontWeight:700,background:ss.bg,color:ss.color,whiteSpace:'nowrap'}}>{i.status}</span></td>
+                        <td>
+                          <div style={{display:'inline-flex',alignItems:'center',gap:7}}>
+                            <div style={{width:22,height:22,borderRadius:'50%',background:acol,flexShrink:0,
+                              display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:800,color:'#fff'}}>{init}</div>
+                            <span style={{fontSize:12}}>{short}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:11,fontWeight:600}}>
+                            <div style={{width:8,height:8,borderRadius:'50%',background:pdot,flexShrink:0}} />
+                            {i.priority}
+                          </div>
+                        </td>
+                        <td>{dueEl}</td>
+                        <td style={{color:'#94a3b8',fontSize:11,whiteSpace:'nowrap'}}>{upd}</td>
+                      </tr>
+                    )
+                  })
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const OWNERS = ['Unassigned', 'Resh', 'Sheila', 'Vannessa', 'Catalog']
 
 // ── MAIN ──────────────────────────────────────────────────────────────────────
 export default function Dashboard() {
@@ -953,50 +1430,42 @@ export default function Dashboard() {
     ]
   }
 
+  const ownerCounts = { Resh: ownerCount('Resh'), Sheila: ownerCount('Sheila'), Vannessa: ownerCount('Vannessa'), Catalog: ownerCount('Catalog') }
+
   return (
-    <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column' }}>
+    <div style={{ minHeight:'100vh', display:'flex', flexDirection:'row', background:'#f1f5f9' }}>
       {panelProduct && (
         <SidePanel product={panelProduct} edits={edits} setEdits={setEdits} onClose={()=>setPanelProduct(null)} />
       )}
-      <div style={S.header}>
-        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-          <div style={{ width:36, height:36, borderRadius:10, background:'linear-gradient(135deg,#818cf8,#6366f1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0, boxShadow:'0 2px 8px rgba(99,102,241,.4)' }}>⛵</div>
-          <div>
-            <div style={{ fontSize:15, fontWeight:800, letterSpacing:'.3px', lineHeight:1.2 }}>Pendleton Amazon Dashboard</div>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,.45)', marginTop:2, letterSpacing:'.2px' }}>Avenue7 Media · {CATALOG.generated}</div>
-          </div>
+
+      {/* ── Left nav sidebar ── */}
+      <NavSidebar tab={tab} setTab={setTab} ownerCounts={ownerCounts} loading={loading} lastSync={lastSync} />
+
+      {/* ── Main content ── */}
+      <div style={{ flex:1, display:'flex', flexDirection:'column', minWidth:0, overflow:'hidden' }}>
+        {/* Stats bar — hidden for Jira tab (it has its own) */}
+        {tab !== 'jira' && <div style={{...S.statsBar, position:'sticky', top:0, zIndex:90}}>
+          {(tabStats[tab]||tabStats.master).map(({v,l},i)=>{
+            const accents=['#6366f1','#0ea5e9','#10b981','#f59e0b','#ec4899','#8b5cf6']
+            const acc = accents[i % accents.length]
+            return (
+              <div key={l} className="stat-card" style={{...S.statCard, borderLeftColor:acc}}>
+                <div style={{fontSize:24,fontWeight:800,color:'#0f172a',lineHeight:1}}>{v}</div>
+                <div style={{fontSize:10,color:'#94a3b8',marginTop:3,fontWeight:500,whiteSpace:'nowrap'}}>{l}</div>
+              </div>
+            )
+          })}
+          <div style={{flex:1}} />
+          <span style={{fontSize:10,color:'#94a3b8',alignSelf:'center',letterSpacing:'.3px'}}>✦ Edits auto-save</span>
+        </div>}
+
+        {/* Tab content */}
+        <div style={{flex:1}}>
+          {tab==='master' && <MasterTab edits={edits} setEdits={setEdits} onOpenPanel={setPanelProduct} />}
+          {tab==='f26' && <F26Tab edits={edits} setEdits={setEdits} onOpenPanel={setPanelProduct} />}
+          {tab==='creative' && <CreativeTab edits={edits} setEdits={setEdits} onOpenPanel={setPanelProduct} />}
+          {tab==='jira' && <JiraTab />}
         </div>
-        <div style={{flex:1}} />
-        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          {loading
-            ? <span style={{fontSize:11,color:'#fbbf24',background:'rgba(251,191,36,.1)',padding:'4px 10px',borderRadius:20}}>⏳ Loading…</span>
-            : <span style={{fontSize:11,color:'#86efac',background:'rgba(134,239,172,.1)',padding:'4px 10px',borderRadius:20,border:'1px solid rgba(134,239,172,.2)'}}>✓ Synced {lastSync}</span>}
-        </div>
-      </div>
-      <div style={S.statsBar}>
-        {(tabStats[tab]||tabStats.master).map(({v,l},i)=>{
-          const accents=['#6366f1','#0ea5e9','#10b981','#f59e0b','#ec4899','#8b5cf6']
-          const acc = accents[i % accents.length]
-          return (
-            <div key={l} className="stat-card" style={{...S.statCard, borderLeftColor:acc}}>
-              <div style={{fontSize:24,fontWeight:800,color:'#0f172a',lineHeight:1}}>{v}</div>
-              <div style={{fontSize:10,color:'#94a3b8',marginTop:3,fontWeight:500,whiteSpace:'nowrap'}}>{l}</div>
-            </div>
-          )
-        })}
-      </div>
-      <div style={S.tabBar}>
-        {[{id:'master',label:'📋 Master Catalog'},{id:'f26',label:'📦 F26 Launches'},{id:'creative',label:'🎨 Creative Tracker'}].map(t=>(
-          <button key={t.id} onClick={()=>setTab(t.id)} className="tab-btn"
-            style={{...S.tabBtn,...(tab===t.id?S.tabBtnActive:{})}}>{t.label}</button>
-        ))}
-        <div style={{flex:1}} />
-        <span style={{fontSize:10,color:'#94a3b8',alignSelf:'center',paddingRight:16,letterSpacing:'.3px'}}>✦ Edits auto-save</span>
-      </div>
-      <div style={{flex:1}}>
-        {tab==='master' && <MasterTab edits={edits} setEdits={setEdits} onOpenPanel={setPanelProduct} />}
-        {tab==='f26' && <F26Tab edits={edits} setEdits={setEdits} onOpenPanel={setPanelProduct} />}
-        {tab==='creative' && <CreativeTab edits={edits} setEdits={setEdits} onOpenPanel={setPanelProduct} />}
       </div>
     </div>
   )
@@ -1010,7 +1479,7 @@ const S = {
   tabBar: { background:'#fff', borderBottom:'1px solid #e2e8f0', padding:'0 24px', display:'flex', gap:2, position:'sticky', top:57, zIndex:90, boxShadow:'0 2px 8px rgba(0,0,0,.04)' },
   tabBtn: { border:'none', borderBottom:'3px solid transparent', background:'transparent', padding:'12px 18px', fontWeight:600, fontSize:13, color:'#64748b', cursor:'pointer', marginBottom:-1 },
   tabBtnActive: { color:'#6366f1', borderBottomColor:'#6366f1' },
-  toolbar: { background:'#fff', borderBottom:'1px solid #f1f5f9', padding:'10px 20px', display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', position:'sticky', top:112, zIndex:80, boxShadow:'0 2px 6px rgba(0,0,0,.04)' },
+  toolbar: { background:'#fff', borderBottom:'1px solid #f1f5f9', padding:'10px 20px', display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', position:'sticky', top:58, zIndex:80, boxShadow:'0 2px 6px rgba(0,0,0,.04)' },
   searchBox: { border:'1px solid #e2e8f0', borderRadius:8, padding:'6px 12px', fontSize:12, width:230, outline:'none', background:'#f8fafc' },
   sel: { border:'1px solid #e2e8f0', borderRadius:8, padding:'6px 10px', fontSize:12, background:'#f8fafc' },
   cbLabel: { fontSize:11, color:'#64748b', display:'flex', alignItems:'center', gap:4 },
@@ -1020,8 +1489,8 @@ const S = {
   th: { background:'#0f172a', color:'#94a3b8', padding:'9px 10px', textAlign:'left', fontSize:10, fontWeight:700, whiteSpace:'nowrap', textTransform:'uppercase', letterSpacing:'.6px' },
   td: { padding:'7px 10px', verticalAlign:'middle', fontSize:12, borderBottom:'1px solid #f1f5f9' },
   pRow: { background:'#fff' },
-  catRow: { background:'linear-gradient(90deg,#eef2ff,#f5f3ff)', padding:'6px 12px', fontWeight:800, fontSize:10, color:'#4338ca', textTransform:'uppercase', letterSpacing:'1px', borderTop:'2px solid #c7d2fe', position:'sticky', top:152, zIndex:60 },
-  pinnedRow: { background:'linear-gradient(90deg,#fefce8,#fffbeb)', padding:'6px 12px', fontWeight:800, fontSize:10, color:'#b45309', textTransform:'uppercase', letterSpacing:'1px', borderTop:'2px solid #fde68a', position:'sticky', top:152, zIndex:60 },
+  catRow: { background:'linear-gradient(90deg,#eef2ff,#f5f3ff)', padding:'6px 12px', fontWeight:800, fontSize:10, color:'#4338ca', textTransform:'uppercase', letterSpacing:'1px', borderTop:'2px solid #c7d2fe', position:'sticky', top:108, zIndex:60 },
+  pinnedRow: { background:'linear-gradient(90deg,#fefce8,#fffbeb)', padding:'6px 12px', fontWeight:800, fontSize:10, color:'#b45309', textTransform:'uppercase', letterSpacing:'1px', borderTop:'2px solid #fde68a', position:'sticky', top:108, zIndex:60 },
   expandBtn: { width:20, height:20, borderRadius:4, border:'1px solid #e2e8f0', background:'#f8fafc', fontSize:9, display:'inline-flex', alignItems:'center', justifyContent:'center', color:'#64748b', cursor:'pointer' },
   noteArea: { width:'100%', border:'1px solid #e2e8f0', borderRadius:6, padding:'4px 8px', fontSize:11, resize:'none', minHeight:28, fontFamily:'inherit', outline:'none', background:'#fafafa' },
   inlineSelect: { border:'1px solid #e2e8f0', borderRadius:6, padding:'4px 6px', fontSize:11, width:'100%', outline:'none', background:'#fafafa' },
