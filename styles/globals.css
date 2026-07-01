@@ -1,14 +1,49 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
   font-size: 13px;
-  background: #f4f5f7;
-  color: #1a1a2e;
+  background: #f1f5f9;
+  color: #0f172a;
+  -webkit-font-smoothing: antialiased;
 }
 button { cursor: pointer; }
 a { color: inherit; }
-textarea, input, select {
-  font-family: inherit;
-  font-size: 12px;
-}
+textarea, input, select { font-family: inherit; font-size: 12px; }
+
+/* Tab hover */
+.tab-btn { transition: color .15s, background .15s; }
+.tab-btn:hover { color: #6366f1 !important; background: #f0f0ff !important; border-radius: 6px 6px 0 0; }
+.tab-btn.active { color: #6366f1 !important; border-bottom: 3px solid #6366f1 !important; }
+
+/* Sidebar item hover */
+.sidebar-item { transition: background .15s, color .15s; }
+.sidebar-item:hover { background: rgba(99,102,241,.15) !important; color: #c7d2fe !important; }
+
+/* Flag button hover */
+.flag-btn { transition: transform .1s, box-shadow .1s; }
+.flag-btn:hover { transform: scale(1.2); box-shadow: 0 2px 6px rgba(0,0,0,.15); }
+
+/* Table row hover */
+.p-row:hover td { background: #fafbff !important; }
+
+/* Toolbar inputs focus */
+.toolbar-input:focus { border-color: #6366f1 !important; outline: none; box-shadow: 0 0 0 2px rgba(99,102,241,.15); }
+
+/* Notes textarea hover/focus */
+.note-area:hover { border-color: #a5b4fc !important; }
+.note-area:focus { border-color: #6366f1 !important; outline: none; box-shadow: 0 0 0 2px rgba(99,102,241,.1); }
+
+/* Inline select hover */
+.inline-select:hover { border-color: #a5b4fc !important; }
+.inline-select:focus { border-color: #6366f1 !important; outline: none; }
+
+/* Add button hover */
+.btn-blue:hover { opacity: .9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99,102,241,.4) !important; transition: all .15s; }
+
+/* Stat cards */
+.stat-card { transition: transform .15s, box-shadow .15s; }
+.stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,.1) !important; }
+
+/* Edit panel button */
+.panel-btn:hover { background: #e0e7ff !important; border-color: #6366f1 !important; }

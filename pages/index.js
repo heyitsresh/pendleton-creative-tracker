@@ -80,6 +80,162 @@ function useDebouncedCallback(fn, delay) {
   }, [fn, delay])
 }
 
+// ── Side Action Panel ─────────────────────────────────────────────────────────
+function SidePanel({ product, edits, setEdits, onClose }) {
+  const debouncedUpsert = useDebouncedCallback(upsertEdit, 600)
+  const debouncedNote  = useDebouncedCallback((asin, notes) => upsertEdit(asin, { notes }), 700)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => { setSaved(false) }, [product?.id])
+
+  if (!product) return null
+  const e = edits[product.id] || {}
+  const cr = product.creative || {}
+
+  function upd(patch) {
+    setEdits(prev => ({ ...prev, [product.id]: { ...(prev[product.id]||{}), asin: product.id, ...patch } }))
+    debouncedUpsert(product.id, patch)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  const crFields = [
+    { key: 'cr_inf',   label: 'Infographics', fallback: cr.inf },
+    { key: 'cr_copy',  label: 'Product Copy',  fallback: cr.copy },
+    { key: 'cr_aplus', label: 'A+ Content',    fallback: cr.aplus },
+  ]
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.25)', zIndex:190 }} />
+      {/* Panel */}
+      <div style={{ position:'fixed', right:0, top:0, bottom:0, width:390, background:'#fff',
+        boxShadow:'-8px 0 40px rgba(0,0,0,.18)', zIndex:200, overflowY:'auto', display:'flex', flexDirection:'column' }}>
+        {/* Header */}
+        <div style={{ background:'linear-gradient(135deg,#0f172a,#1e1b4b)', color:'#fff', padding:'16px 18px', display:'flex', alignItems:'flex-start', gap:10 }}>
+          <div style={{ flex:1 }}>
+            <div style={{ fontWeight:800, fontSize:14, lineHeight:1.3 }}>{product.title}</div>
+            <div style={{ fontSize:10, color:'#aaa', fontFamily:'monospace', marginTop:4 }}>{product.id}</div>
+            <div style={{ marginTop:6 }}><Pill label={product.status} /></div>
+          </div>
+          <button onClick={onClose} style={{ background:'rgba(255,255,255,.15)', border:'none', color:'#fff', borderRadius:6, width:28, height:28, fontSize:14, display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding:'16px', flex:1, display:'flex', flexDirection:'column', gap:16 }}>
+
+          {/* Owner */}
+          <div style={SP.section}>
+            <div style={SP.label}>Assigned To</div>
+            <select value={e.owner||''} onChange={ev=>upd({owner:ev.target.value})} style={SP.select}>
+              {OWNERS.map(o=><option key={o} value={o===OWNERS[0]?'':o}>{o}</option>)}
+            </select>
+          </div>
+
+          {/* My Status */}
+          <div style={SP.section}>
+            <div style={SP.label}>My Status</div>
+            <select value={e.status_override||''} onChange={ev=>upd({status_override:ev.target.value})} style={SP.select}>
+              {OVERRIDE_OPTIONS.map(o=><option key={o} value={o}>{o||'— not set'}</option>)}
+            </select>
+          </div>
+
+          {/* Creative Status */}
+          <div style={SP.section}>
+            <div style={SP.label}>Creative Status</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {crFields.map(({ key, label, fallback }) => {
+                const cur = e[key] || fallback || ''
+                const cs = CR_COLORS[cur] || {}
+                return (
+                  <div key={key} style={{ display:'flex', alignItems:'center', gap:10 }}>
+                    <span style={{ width:100, fontSize:11, color:'#555', flexShrink:0 }}>{label}</span>
+                    <select value={e[key]||fallback||''} onChange={ev=>upd({[key]:ev.target.value})}
+                      style={{ ...SP.select, flex:1, background:cs.bg||'#fafafa', color:cs.color||'#333', fontWeight:cur?700:400 }}>
+                      <option value="">—</option>
+                      {['Done','Uploading','In Progress','Pending','N/A'].map(o=><option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Jira */}
+          <div style={SP.section}>
+            <div style={SP.label}>Jira Ticket</div>
+            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+              <input placeholder="e.g. CREATE-123" defaultValue={e.jira_ticket||product.jira?.epic||''}
+                onBlur={ev=>upd({jira_ticket:ev.target.value})}
+                style={{ ...SP.input, flex:1 }} />
+              {(e.jira_ticket||product.jira?.epic) &&
+                <JiraLink ticket={e.jira_ticket||product.jira?.epic} />}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div style={SP.section}>
+            <div style={SP.label}>Notes</div>
+            <textarea defaultValue={e.notes||''} rows={4}
+              onChange={ev=>debouncedNote(product.id, ev.target.value)}
+              placeholder="Add notes, action items, context…"
+              style={{ ...SP.input, resize:'vertical', minHeight:80, lineHeight:1.5 }} />
+          </div>
+
+          {/* Flags */}
+          <div style={SP.section}>
+            <div style={SP.label}>Flag</div>
+            <div style={{ display:'flex', gap:8 }}>
+              {[['red','🔴','Flag'],['blue','🔵','Watch'],['star','⭐','Priority']].map(([f,emoji,tip])=>(
+                <button key={f} title={tip} onClick={()=>upd({[`flag_${f}`]:!e[`flag_${f}`]})}
+                  style={{ flex:1, padding:'8px 4px', borderRadius:8, border:'2px solid',
+                    borderColor: e[`flag_${f}`]?'#818cf8':'#e5e7eb',
+                    background: e[`flag_${f}`]?'#e0e7ff':'#f9fafb',
+                    fontSize:18, cursor:'pointer' }}>
+                  {emoji}<div style={{ fontSize:10, color:'#555', marginTop:2 }}>{tip}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Optimization snapshot */}
+          <div style={SP.section}>
+            <div style={SP.label}>Optimization</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+              {[['Bullets',product.bi],['Description',product.di],['Main Image',product.mi],['Gallery',product.ii]].map(([l,v])=>(
+                <div key={l} style={{ background:v?'#dcfce7':'#fee2e2', borderRadius:6, padding:'6px 10px', display:'flex', alignItems:'center', gap:6, fontSize:11 }}>
+                  <span style={{ fontSize:13 }}>{v?'✓':'✗'}</span> {l}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Amazon link */}
+          <a href={`https://www.amazon.com/dp/${product.id}`} target="_blank" rel="noreferrer"
+            style={{ textAlign:'center', background:'#ff9900', color:'#fff', borderRadius:8, padding:'10px', fontWeight:700, fontSize:12, textDecoration:'none', display:'block' }}>
+            🛒 View on Amazon
+          </a>
+        </div>
+
+        {/* Save status */}
+        {saved && (
+          <div style={{ position:'sticky', bottom:0, background:'#dcfce7', color:'#166534', padding:'8px 16px', fontSize:11, fontWeight:600, textAlign:'center' }}>
+            ✓ Saved
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
+const SP = {
+  section: { display:'flex', flexDirection:'column', gap:6 },
+  label: { fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'.8px', color:'#9ca3af' },
+  select: { border:'1px solid #e5e7eb', borderRadius:6, padding:'7px 10px', fontSize:12, outline:'none', width:'100%' },
+  input: { border:'1px solid #e5e7eb', borderRadius:6, padding:'7px 10px', fontSize:12, outline:'none', width:'100%', fontFamily:'inherit' },
+}
+
 // ── Category Sidebar ──────────────────────────────────────────────────────────
 function CategorySidebar({ cats, products, catFilter, setCatFilter }) {
   const [open, setOpen] = useState(false)
@@ -91,32 +247,33 @@ function CategorySidebar({ cats, products, catFilter, setCatFilter }) {
       onMouseEnter={()=>setOpen(true)}
       onMouseLeave={()=>setOpen(false)}
       style={{
-        width: open ? 190 : 44, minHeight:'100%',
-        background:'#1a1a2e', transition:'width .2s ease',
+        width: open ? 196 : 46, minHeight:'100%',
+        background:'#0f172a', transition:'width .2s ease',
         overflow:'hidden', flexShrink:0,
-        position:'sticky', top:100, alignSelf:'flex-start',
-        borderRight:'1px solid #2a2a4e', zIndex:70,
+        position:'sticky', top:112, alignSelf:'flex-start',
+        borderRight:'1px solid rgba(255,255,255,.06)', zIndex:70,
       }}
     >
       {/* All */}
       <div onClick={()=>setCatFilter('')}
-        style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', cursor:'pointer',
-          background: !catFilter ? '#4a6cf7' : 'transparent',
-          color: !catFilter ? '#fff' : '#aaa', fontSize:11, fontWeight:700,
-          borderBottom:'1px solid #2a2a4e', whiteSpace:'nowrap' }}>
+        style={{ display:'flex', alignItems:'center', gap:10, padding:'11px 13px', cursor:'pointer',
+          background: !catFilter ? 'linear-gradient(90deg,#6366f1,#4f46e5)' : 'transparent',
+          color: !catFilter ? '#fff' : '#64748b', fontSize:11, fontWeight:700,
+          borderBottom:'1px solid rgba(255,255,255,.05)', whiteSpace:'nowrap' }}>
         <span style={{minWidth:20,textAlign:'center',fontSize:12}}>☰</span>
         {open && <span>All Categories</span>}
       </div>
       {cats.map(c=>(
-        <div key={c} onClick={()=>setCatFilter(catFilter===c?'':c)}
-          style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', cursor:'pointer',
-            background: catFilter===c ? '#4a6cf7' : 'transparent',
-            color: catFilter===c ? '#fff' : '#9ca3af',
+        <div key={c} onClick={()=>setCatFilter(catFilter===c?'':c)} className="sidebar-item"
+          style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 13px', cursor:'pointer',
+            background: catFilter===c ? 'rgba(99,102,241,.2)' : 'transparent',
+            color: catFilter===c ? '#c7d2fe' : '#64748b',
             fontSize:11, fontWeight:600, whiteSpace:'nowrap',
-            borderBottom:'1px solid #1f1f3a',
-            transition:'background .1s' }}>
-          <span style={{minWidth:20,textAlign:'center',fontSize:10,background:'rgba(255,255,255,.1)',borderRadius:4,padding:'2px 3px'}}>{initials(c)}</span>
-          {open && <><span style={{flex:1}}>{c}</span><span style={{fontSize:10,color:'#4a6cf7',fontWeight:800}}>{counts[c]||0}</span></>}
+            borderBottom:'1px solid rgba(255,255,255,.04)',
+            transition:'background .15s,color .15s',
+            borderLeft: catFilter===c ? '3px solid #6366f1' : '3px solid transparent' }}>
+          <span style={{minWidth:20,textAlign:'center',fontSize:10,background:'rgba(255,255,255,.07)',borderRadius:4,padding:'2px 3px',flexShrink:0}}>{initials(c)}</span>
+          {open && <><span style={{flex:1}}>{c}</span><span style={{fontSize:10,color:'#6366f1',fontWeight:800}}>{counts[c]||0}</span></>}
         </div>
       ))}
     </div>
@@ -157,7 +314,7 @@ async function deleteNewProduct(id) {
 }
 
 // ── MASTER TAB ───────────────────────────────────────────────────────────────
-function MasterTab({ edits, setEdits }) {
+function MasterTab({ edits, setEdits, onOpenPanel }) {
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('')
   const [deptFilter, setDeptFilter] = useState('')
@@ -218,7 +375,7 @@ function MasterTab({ edits, setEdits }) {
   return (
     <div style={{ display:'flex' }}>
       <CategorySidebar cats={cats} products={products} catFilter={catFilter} setCatFilter={setCatFilter} />
-      <div style={{ flex:1, overflow:'hidden' }}>
+      <div style={{ flex:1, minWidth:0 }}>
       <div style={S.toolbar}>
         <input style={S.searchBox} placeholder="Search product, ASIN, SKU…" value={search} onChange={e=>setSearch(e.target.value)} />
         <select style={S.sel} value={catFilter} onChange={e=>setCatFilter(e.target.value)}>
@@ -259,6 +416,7 @@ function MasterTab({ edits, setEdits }) {
               <th style={{...S.th,width:125}}>Creative Status</th>
               <th style={{...S.th,width:140}}>Notes</th>
               <th style={{...S.th,width:80}}>Flag</th>
+              <th style={{...S.th,width:36}}></th>
             </tr>
           </thead>
           <tbody>
@@ -271,7 +429,7 @@ function MasterTab({ edits, setEdits }) {
               const isExp = expanded.has(p.id)
               const hasChildren = (p.children||[]).length > 0
               return [
-                <tr key={p.id} style={S.pRow}>
+                <tr key={p.id} className="p-row" style={S.pRow}>
                   <td style={{...S.td,textAlign:'center',padding:'4px 4px'}}>
                     {hasChildren && <button onClick={()=>toggleExpand(p.id)} style={S.expandBtn}>{isExp?'▾':'▸'}</button>}
                   </td>
@@ -331,6 +489,10 @@ function MasterTab({ edits, setEdits }) {
                           style={{...S.flagBtn,background:e[`flag_${f}`]?'#e0e7ff':'#f9fafb',borderColor:e[`flag_${f}`]?'#818cf8':'#e5e7eb'}}>{emoji}</button>
                       ))}
                     </div>
+                  </td>
+                  <td style={{...S.td,padding:'4px 6px',textAlign:'center'}}>
+                    <button onClick={()=>onOpenPanel(p)} title="Edit in panel" className="panel-btn"
+                      style={{background:'#f5f3ff',border:'1px solid #ddd6fe',borderRadius:6,width:28,height:28,color:'#6366f1',fontSize:12,display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',transition:'all .15s'}}>✏️</button>
                   </td>
                 </tr>,
                 ...((p.children||[]).map(c=>(
@@ -435,7 +597,7 @@ function F26Tab({ edits, setEdits }) {
             const isCatalog = r._source === 'catalog'
             const key = isCatalog ? `cat_${i}` : r.id
             return (
-              <tr key={key} style={S.pRow}>
+              <tr key={key} className="p-row" style={S.pRow}>
                 <td style={{...S.td,fontWeight:600}}>{r.name||'—'}</td>
                 <td style={S.td}>
                   {isCatalog ? (
@@ -560,7 +722,7 @@ function F26Tab({ edits, setEdits }) {
             const e = edits[p.id] || {}
             const cr = p.creative || {}
             return (
-              <tr key={p.id} style={S.pRow}>
+              <tr key={p.id} className="p-row" style={S.pRow}>
                 <td style={{...S.td,fontFamily:'monospace',fontSize:10}}>
                   <a href={`https://www.amazon.com/dp/${p.id}`} target="_blank" rel="noreferrer" style={{color:'#4a6cf7',textDecoration:'none'}}>{p.id}</a>
                   {saving[p.id]&&<span style={{marginLeft:4,fontSize:9,color:'#f59e0b'}}>saving…</span>}
@@ -607,13 +769,14 @@ function F26Tab({ edits, setEdits }) {
 }
 
 // ── CREATIVE TAB ──────────────────────────────────────────────────────────────
-function CreativeTab({ edits, setEdits }) {
+function CreativeTab({ edits, setEdits, onOpenPanel }) {
   const [saving, setSaving] = useState({})
   const debouncedUpsert = useDebouncedCallback(async (asin, patch) => {
     setSaving(s=>({...s,[asin]:true}))
     await upsertEdit(asin, patch)
     setSaving(s=>{const n={...s};delete n[asin];return n})
   }, 700)
+  const debouncedNoteSave = useDebouncedCallback((asin, notes) => upsertEdit(asin, { notes }), 800)
 
   function updateEdit(asin, patch) {
     setEdits(prev=>({...prev,[asin]:{...(prev[asin]||{}),asin,...patch}}))
@@ -642,16 +805,16 @@ function CreativeTab({ edits, setEdits }) {
     <div style={{ padding:'16px 16px 32px' }}>
       {/* Donut summary cards */}
       <div style={{ display:'flex', gap:16, marginBottom:28, flexWrap:'wrap' }}>
-        {[{label:'Infographics',data:infData},{label:'Product Copy',data:copyData},{label:'A+ Content',data:aplusData}].map(({label,data})=>(
-          <div key={label} style={{ background:'#fff', borderRadius:10, padding:'16px 20px', boxShadow:'0 1px 6px rgba(0,0,0,.08)', display:'flex', gap:20, alignItems:'center', minWidth:260 }}>
-            <DonutChart data={data} size={90} />
-            <div>
-              <div style={{ fontWeight:700, fontSize:13, color:'#1a1a2e', marginBottom:10 }}>{label}</div>
+        {[{label:'Infographics',data:infData,accent:'#6366f1'},{label:'Product Copy',data:copyData,accent:'#0ea5e9'},{label:'A+ Content',data:aplusData,accent:'#10b981'}].map(({label,data,accent})=>(
+          <div key={label} style={{ background:'#fff', borderRadius:12, padding:'18px 22px', boxShadow:'0 2px 16px rgba(0,0,0,.08)', display:'flex', gap:20, alignItems:'center', minWidth:268, borderTop:`3px solid ${accent}`, flex:1 }}>
+            <DonutChart data={data} size={92} />
+            <div style={{flex:1}}>
+              <div style={{ fontWeight:800, fontSize:12, color:'#0f172a', marginBottom:12, textTransform:'uppercase', letterSpacing:'.6px' }}>{label}</div>
               {data.map(d=>(
-                <div key={d.label} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:5 }}>
-                  <span style={{ width:10, height:10, borderRadius:'50%', background:d.hex, display:'inline-block', flexShrink:0 }} />
-                  <span style={{ fontSize:11, color:'#555', flex:1 }}>{d.label}</span>
-                  <span style={{ fontWeight:800, fontSize:13, color:'#1a1a2e' }}>{d.value}</span>
+                <div key={d.label} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                  <span style={{ width:8, height:8, borderRadius:'50%', background:d.hex, display:'inline-block', flexShrink:0 }} />
+                  <span style={{ fontSize:11, color:'#64748b', flex:1 }}>{d.label}</span>
+                  <span style={{ fontWeight:800, fontSize:13, color:'#0f172a' }}>{d.value}</span>
                 </div>
               ))}
             </div>
@@ -665,13 +828,15 @@ function CreativeTab({ edits, setEdits }) {
         <thead>
           <tr>
             <th style={{...S.th,width:110}}>ASIN</th>
-            <th style={{...S.th,width:220}}>Product</th>
+            <th style={{...S.th,width:200}}>Product</th>
             <th style={{...S.th,width:75}}>Status</th>
-            <th style={{...S.th,width:100}}>Infographics</th>
-            <th style={{...S.th,width:100}}>Product Copy</th>
-            <th style={{...S.th,width:100}}>A+ Content</th>
-            <th style={{...S.th,width:160}}>Jira Ticket</th>
-            <th style={{...S.th,width:130}}>Notes</th>
+            <th style={{...S.th,width:95}}>Infographics</th>
+            <th style={{...S.th,width:95}}>Product Copy</th>
+            <th style={{...S.th,width:95}}>A+ Content</th>
+            <th style={{...S.th,width:95}}>Owner</th>
+            <th style={{...S.th,width:140}}>Jira Ticket</th>
+            <th style={{...S.th,width:160}}>Notes</th>
+            <th style={{...S.th,width:36}}></th>
           </tr>
         </thead>
         <tbody>
@@ -679,9 +844,9 @@ function CreativeTab({ edits, setEdits }) {
             const e = edits[p.id] || {}
             const cr = p.creative || {}
             return (
-              <tr key={p.id} style={S.pRow}>
+              <tr key={p.id} className="p-row" style={S.pRow}>
                 <td style={{...S.td,fontFamily:'monospace',fontSize:10}}>
-                  <a href={`https://www.amazon.com/dp/${p.id}`} target="_blank" rel="noreferrer" style={{color:'#4a6cf7',textDecoration:'none'}}>{p.id}</a>
+                  <a href={`https://www.amazon.com/dp/${p.id}`} target="_blank" rel="noreferrer" style={{color:'#6366f1',textDecoration:'none'}}>{p.id}</a>
                   {saving[p.id]&&<span style={{marginLeft:4,fontSize:9,color:'#f59e0b'}}>saving…</span>}
                 </td>
                 <td style={{...S.td,fontWeight:600,fontSize:12}}>{p.title}</td>
@@ -692,7 +857,7 @@ function CreativeTab({ edits, setEdits }) {
                   return (
                     <td key={f} style={S.td}>
                       <select value={e[f]||fb||''} onChange={ev=>updateEdit(p.id,{[f]:ev.target.value})}
-                        style={{...S.inlineSelect,minWidth:90,background:cs.bg||'#fafafa',color:cs.color||'#333',fontWeight:cur?700:400}}>
+                        style={{...S.inlineSelect,minWidth:88,background:cs.bg||'#fafafa',color:cs.color||'#333',fontWeight:cur?700:400}}>
                         <option value="">—</option>
                         {['Done','Uploading','In Progress','Pending','N/A'].map(o=><option key={o} value={o}>{o}</option>)}
                       </select>
@@ -700,16 +865,29 @@ function CreativeTab({ edits, setEdits }) {
                   )
                 })}
                 <td style={S.td}>
+                  <select value={e.owner||''} onChange={ev=>updateEdit(p.id,{owner:ev.target.value})}
+                    style={{...S.crSelect,minWidth:88,fontWeight:e.owner?700:400,
+                      background:e.owner?'#f5f3ff':'#fafafa',color:e.owner?'#6d28d9':'#94a3b8'}}>
+                    <option value="">—</option>
+                    {['Resh','Sheila','Vannessa'].map(o=><option key={o} value={o}>{o}</option>)}
+                  </select>
+                </td>
+                <td style={S.td}>
                   <div style={{display:'flex',gap:4,alignItems:'center'}}>
                     <input placeholder="CREATE-123" defaultValue={e.jira_ticket||p.jira?.epic||''}
                       onBlur={ev=>updateEdit(p.id,{jira_ticket:ev.target.value})}
-                      style={{...S.inlineSelect,width:100}} />
+                      style={{...S.inlineSelect,width:96}} />
                     {(e.jira_ticket||p.jira?.epic) && <JiraLink ticket={e.jira_ticket||p.jira?.epic} />}
                   </div>
                 </td>
                 <td style={S.td}>
                   <textarea defaultValue={e.notes||''} placeholder="Note…" rows={1}
-                    onBlur={ev=>updateEdit(p.id,{notes:ev.target.value})} style={S.noteArea} />
+                    onChange={ev=>debouncedNoteSave(p.id,ev.target.value)}
+                    className="note-area" style={S.noteArea} />
+                </td>
+                <td style={{...S.td,textAlign:'center',padding:'4px 6px'}}>
+                  <button onClick={()=>onOpenPanel(p)} title="Edit in panel" className="panel-btn"
+                    style={{background:'#f5f3ff',border:'1px solid #ddd6fe',borderRadius:6,width:28,height:28,color:'#6366f1',fontSize:12,display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',transition:'all .15s'}}>✏️</button>
                 </td>
               </tr>
             )
@@ -720,12 +898,15 @@ function CreativeTab({ edits, setEdits }) {
   )
 }
 
+const OWNERS = ['Unassigned', 'Resh', 'Sheila', 'Vannessa']
+
 // ── MAIN ──────────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const [tab, setTab] = useState('master')
   const [edits, setEdits] = useState({})
   const [loading, setLoading] = useState(true)
   const [lastSync, setLastSync] = useState(null)
+  const [panelProduct, setPanelProduct] = useState(null)
 
   useEffect(() => {
     fetchAllEdits().then(data => {
@@ -733,35 +914,89 @@ export default function Dashboard() {
     })
   }, [])
 
+  // Tab-specific stats
+  const trackedProducts = products.filter(p => p.creative)
+  function crCount(field, val) {
+    return trackedProducts.filter(p => {
+      const e = edits[p.id] || {}
+      const cur = e[`cr_${field}`] || (p.creative?.[field]) || 'Pending'
+      return cur === val
+    }).length
+  }
+  function ownerCount(owner) {
+    return trackedProducts.filter(p => (edits[p.id]||{}).owner === owner).length
+  }
+  const openCreatives = trackedProducts.filter(p => {
+    const e = edits[p.id] || {}
+    const inf = e.cr_inf || p.creative?.inf || 'Pending'
+    const copy = e.cr_copy || p.creative?.copy || 'Pending'
+    const aplus = e.cr_aplus || p.creative?.aplus || 'Pending'
+    return [inf, copy, aplus].some(v => v !== 'Done' && v !== 'N/A')
+  }).length
+
+  const tabStats = {
+    master: [
+      {v:stats.total,l:'Parent Products'},{v:stats.active,l:'Active'},
+      {v:stats.inactive,l:'Inactive/Removed'},{v:stats.f26_live,l:'F26 Live'},
+      {v:stats.f26_pending,l:'F26 Pending'},{v:stats.creative,l:'Creative Tracked'}
+    ],
+    f26: [
+      {v:stats.f26_live,l:'Live in Catalog'},{v:stats.f26_pending,l:'Pending Creation'},
+      {v:crCount('inf','Done'),l:'Inf Done'},{v:crCount('inf','Uploading'),l:'Inf Uploading'},
+      {v:crCount('copy','Done'),l:'Copy Done'},{v:crCount('aplus','Done'),l:'A+ Done'}
+    ],
+    creative: [
+      {v:trackedProducts.length,l:'Total Tracked'},{v:openCreatives,l:'Open Creatives'},
+      {v:crCount('inf','Done')+crCount('copy','Done')+crCount('aplus','Done'),l:'Components Done'},
+      {v:ownerCount('Resh'),l:'Resh'},{v:ownerCount('Sheila'),l:'Sheila'},
+      {v:ownerCount('Vannessa'),l:'Vannessa'}
+    ]
+  }
+
   return (
     <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column' }}>
+      {panelProduct && (
+        <SidePanel product={panelProduct} edits={edits} setEdits={setEdits} onClose={()=>setPanelProduct(null)} />
+      )}
       <div style={S.header}>
-        <div>
-          <div style={{ fontSize:16, fontWeight:800, letterSpacing:'.5px' }}>⛵ Pendleton · Amazon Dashboard</div>
-          <div style={{ fontSize:10, color:'#aaa', marginTop:2 }}>Avenue7 Media · Generated: {CATALOG.generated}</div>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <div style={{ width:36, height:36, borderRadius:10, background:'linear-gradient(135deg,#818cf8,#6366f1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0, boxShadow:'0 2px 8px rgba(99,102,241,.4)' }}>⛵</div>
+          <div>
+            <div style={{ fontSize:15, fontWeight:800, letterSpacing:'.3px', lineHeight:1.2 }}>Pendleton Amazon Dashboard</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,.45)', marginTop:2, letterSpacing:'.2px' }}>Avenue7 Media · {CATALOG.generated}</div>
+          </div>
         </div>
         <div style={{flex:1}} />
-        {loading
-          ? <span style={{fontSize:11,color:'#f59e0b'}}>Loading edits…</span>
-          : <span style={{fontSize:11,color:'#6ee7b7'}}>✓ Synced {lastSync}</span>}
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          {loading
+            ? <span style={{fontSize:11,color:'#fbbf24',background:'rgba(251,191,36,.1)',padding:'4px 10px',borderRadius:20}}>⏳ Loading…</span>
+            : <span style={{fontSize:11,color:'#86efac',background:'rgba(134,239,172,.1)',padding:'4px 10px',borderRadius:20,border:'1px solid rgba(134,239,172,.2)'}}>✓ Synced {lastSync}</span>}
+        </div>
       </div>
       <div style={S.statsBar}>
-        {[{v:stats.total,l:'Parent Products'},{v:stats.active,l:'Active'},{v:stats.inactive,l:'Inactive/Removed'},{v:stats.f26_live,l:'F26 Live'},{v:stats.f26_pending,l:'F26 Pending'},{v:stats.creative,l:'Creative Tracked'}].map(({v,l})=>(
-          <div key={l} style={S.statCard}><div style={{fontSize:22,fontWeight:800,color:'#1a1a2e'}}>{v}</div><div style={{fontSize:10,color:'#666'}}>{l}</div></div>
-        ))}
+        {(tabStats[tab]||tabStats.master).map(({v,l},i)=>{
+          const accents=['#6366f1','#0ea5e9','#10b981','#f59e0b','#ec4899','#8b5cf6']
+          const acc = accents[i % accents.length]
+          return (
+            <div key={l} className="stat-card" style={{...S.statCard, borderLeftColor:acc}}>
+              <div style={{fontSize:24,fontWeight:800,color:'#0f172a',lineHeight:1}}>{v}</div>
+              <div style={{fontSize:10,color:'#94a3b8',marginTop:3,fontWeight:500,whiteSpace:'nowrap'}}>{l}</div>
+            </div>
+          )
+        })}
       </div>
       <div style={S.tabBar}>
         {[{id:'master',label:'📋 Master Catalog'},{id:'f26',label:'📦 F26 Launches'},{id:'creative',label:'🎨 Creative Tracker'}].map(t=>(
-          <button key={t.id} onClick={()=>setTab(t.id)}
+          <button key={t.id} onClick={()=>setTab(t.id)} className="tab-btn"
             style={{...S.tabBtn,...(tab===t.id?S.tabBtnActive:{})}}>{t.label}</button>
         ))}
         <div style={{flex:1}} />
-        <span style={{fontSize:11,color:'#888',alignSelf:'center',paddingRight:16}}>Edits auto-save ✦</span>
+        <span style={{fontSize:10,color:'#94a3b8',alignSelf:'center',paddingRight:16,letterSpacing:'.3px'}}>✦ Edits auto-save</span>
       </div>
       <div style={{flex:1}}>
-        {tab==='master' && <MasterTab edits={edits} setEdits={setEdits} />}
-        {tab==='f26' && <F26Tab edits={edits} setEdits={setEdits} />}
-        {tab==='creative' && <CreativeTab edits={edits} setEdits={setEdits} />}
+        {tab==='master' && <MasterTab edits={edits} setEdits={setEdits} onOpenPanel={setPanelProduct} />}
+        {tab==='f26' && <F26Tab edits={edits} setEdits={setEdits} onOpenPanel={setPanelProduct} />}
+        {tab==='creative' && <CreativeTab edits={edits} setEdits={setEdits} onOpenPanel={setPanelProduct} />}
       </div>
     </div>
   )
@@ -769,28 +1004,28 @@ export default function Dashboard() {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const S = {
-  header: { background:'#1a1a2e', color:'#fff', padding:'12px 20px', display:'flex', alignItems:'center', gap:16, position:'sticky', top:0, zIndex:100, boxShadow:'0 2px 8px rgba(0,0,0,.3)' },
-  statsBar: { background:'#fff', borderBottom:'1px solid #e5e7eb', padding:'10px 20px', display:'flex', gap:12, flexWrap:'wrap' },
-  statCard: { background:'#f8f9ff', borderRadius:8, padding:'8px 16px', textAlign:'center' },
-  tabBar: { background:'#fff', borderBottom:'2px solid #e5e7eb', padding:'0 16px', display:'flex', gap:4, position:'sticky', top:52, zIndex:90 },
-  tabBtn: { border:'none', borderBottom:'2px solid transparent', background:'transparent', padding:'10px 16px', fontWeight:600, fontSize:13, color:'#666', cursor:'pointer', marginBottom:-2 },
-  tabBtnActive: { color:'#4a6cf7', borderBottomColor:'#4a6cf7' },
-  toolbar: { background:'#fff', borderBottom:'1px solid #eee', padding:'8px 16px', display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', position:'sticky', top:100, zIndex:80 },
-  searchBox: { border:'1px solid #d1d5db', borderRadius:6, padding:'5px 10px', fontSize:12, width:230, outline:'none' },
-  sel: { border:'1px solid #d1d5db', borderRadius:6, padding:'5px 8px', fontSize:12, background:'#fff' },
-  cbLabel: { fontSize:11, color:'#555', display:'flex', alignItems:'center', gap:4 },
-  btnGray: { border:'1px solid #d1d5db', borderRadius:6, padding:'5px 10px', fontSize:11, fontWeight:600, background:'#f3f4f6', color:'#444' },
-  btnBlue: { border:'none', borderRadius:6, padding:'6px 12px', fontSize:11, fontWeight:700, background:'#4a6cf7', color:'#fff', cursor:'pointer' },
-  table: { borderCollapse:'collapse', width:'100%', minWidth:1000, background:'#fff', borderRadius:8, overflow:'hidden', boxShadow:'0 1px 4px rgba(0,0,0,.08)' },
-  th: { background:'#1a1a2e', color:'#fff', padding:'7px 8px', textAlign:'left', fontSize:11, fontWeight:600, whiteSpace:'nowrap' },
-  td: { padding:'5px 8px', verticalAlign:'middle', fontSize:12, borderBottom:'1px solid #f0f0f0' },
+  header: { background:'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)', color:'#fff', padding:'14px 24px', display:'flex', alignItems:'center', gap:16, position:'sticky', top:0, zIndex:100, boxShadow:'0 4px 20px rgba(0,0,0,.35)', borderBottom:'1px solid rgba(255,255,255,.07)' },
+  statsBar: { background:'#fff', borderBottom:'1px solid #e2e8f0', padding:'12px 24px', display:'flex', gap:10, flexWrap:'wrap', boxShadow:'0 1px 4px rgba(0,0,0,.04)' },
+  statCard: { background:'#fff', borderRadius:10, padding:'10px 20px', textAlign:'center', borderLeft:'3px solid #6366f1', boxShadow:'0 1px 6px rgba(0,0,0,.07)', minWidth:88 },
+  tabBar: { background:'#fff', borderBottom:'1px solid #e2e8f0', padding:'0 24px', display:'flex', gap:2, position:'sticky', top:57, zIndex:90, boxShadow:'0 2px 8px rgba(0,0,0,.04)' },
+  tabBtn: { border:'none', borderBottom:'3px solid transparent', background:'transparent', padding:'12px 18px', fontWeight:600, fontSize:13, color:'#64748b', cursor:'pointer', marginBottom:-1 },
+  tabBtnActive: { color:'#6366f1', borderBottomColor:'#6366f1' },
+  toolbar: { background:'#fff', borderBottom:'1px solid #f1f5f9', padding:'10px 20px', display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', position:'sticky', top:112, zIndex:80, boxShadow:'0 2px 6px rgba(0,0,0,.04)' },
+  searchBox: { border:'1px solid #e2e8f0', borderRadius:8, padding:'6px 12px', fontSize:12, width:230, outline:'none', background:'#f8fafc' },
+  sel: { border:'1px solid #e2e8f0', borderRadius:8, padding:'6px 10px', fontSize:12, background:'#f8fafc' },
+  cbLabel: { fontSize:11, color:'#64748b', display:'flex', alignItems:'center', gap:4 },
+  btnGray: { border:'1px solid #e2e8f0', borderRadius:8, padding:'6px 12px', fontSize:11, fontWeight:600, background:'#f8fafc', color:'#475569', cursor:'pointer' },
+  btnBlue: { border:'none', borderRadius:8, padding:'7px 14px', fontSize:11, fontWeight:700, background:'linear-gradient(135deg, #6366f1, #4f46e5)', color:'#fff', cursor:'pointer', boxShadow:'0 2px 8px rgba(99,102,241,.3)' },
+  table: { borderCollapse:'collapse', width:'100%', minWidth:1000, background:'#fff', borderRadius:10, overflow:'hidden', boxShadow:'0 2px 12px rgba(0,0,0,.08)' },
+  th: { background:'#0f172a', color:'#94a3b8', padding:'9px 10px', textAlign:'left', fontSize:10, fontWeight:700, whiteSpace:'nowrap', textTransform:'uppercase', letterSpacing:'.6px' },
+  td: { padding:'7px 10px', verticalAlign:'middle', fontSize:12, borderBottom:'1px solid #f1f5f9' },
   pRow: { background:'#fff' },
-  catRow: { background:'#e8ecff', padding:'5px 10px', fontWeight:700, fontSize:11, color:'#1a1a2e', textTransform:'uppercase', letterSpacing:'.5px', borderTop:'2px solid #c5ceff', position:'sticky', top:138, zIndex:60 },
-  pinnedRow: { background:'#fef9c3', padding:'5px 10px', fontWeight:700, fontSize:11, color:'#854d0e', textTransform:'uppercase', letterSpacing:'.5px', borderTop:'2px solid #fde047', position:'sticky', top:138, zIndex:60 },
-  expandBtn: { width:20, height:20, borderRadius:3, border:'1px solid #d1d5db', background:'#f9fafb', fontSize:9, display:'inline-flex', alignItems:'center', justifyContent:'center', color:'#666' },
-  noteArea: { width:'100%', border:'1px solid #e5e7eb', borderRadius:4, padding:'3px 6px', fontSize:11, resize:'none', minHeight:26, fontFamily:'inherit', outline:'none' },
-  inlineSelect: { border:'1px solid #e5e7eb', borderRadius:4, padding:'3px 5px', fontSize:11, width:'100%', outline:'none' },
-  crSelect: { border:'1px solid #e5e7eb', borderRadius:4, padding:'2px 4px', fontSize:10, width:'100%', outline:'none', background:'#fafafa' },
-  flagBtn: { width:26, height:22, borderRadius:4, border:'1px solid #e5e7eb', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center' },
-  sectionTitle: { fontSize:14, fontWeight:700, color:'#1a1a2e', marginBottom:12, paddingBottom:8, borderBottom:'2px solid #e5e7eb' },
+  catRow: { background:'linear-gradient(90deg,#eef2ff,#f5f3ff)', padding:'6px 12px', fontWeight:800, fontSize:10, color:'#4338ca', textTransform:'uppercase', letterSpacing:'1px', borderTop:'2px solid #c7d2fe', position:'sticky', top:152, zIndex:60 },
+  pinnedRow: { background:'linear-gradient(90deg,#fefce8,#fffbeb)', padding:'6px 12px', fontWeight:800, fontSize:10, color:'#b45309', textTransform:'uppercase', letterSpacing:'1px', borderTop:'2px solid #fde68a', position:'sticky', top:152, zIndex:60 },
+  expandBtn: { width:20, height:20, borderRadius:4, border:'1px solid #e2e8f0', background:'#f8fafc', fontSize:9, display:'inline-flex', alignItems:'center', justifyContent:'center', color:'#64748b', cursor:'pointer' },
+  noteArea: { width:'100%', border:'1px solid #e2e8f0', borderRadius:6, padding:'4px 8px', fontSize:11, resize:'none', minHeight:28, fontFamily:'inherit', outline:'none', background:'#fafafa' },
+  inlineSelect: { border:'1px solid #e2e8f0', borderRadius:6, padding:'4px 6px', fontSize:11, width:'100%', outline:'none', background:'#fafafa' },
+  crSelect: { border:'1px solid #e2e8f0', borderRadius:5, padding:'3px 5px', fontSize:10, width:'100%', outline:'none', background:'#fafafa' },
+  flagBtn: { width:28, height:24, borderRadius:5, border:'1px solid #e2e8f0', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', background:'#fff' },
+  sectionTitle: { fontSize:11, fontWeight:800, color:'#475569', marginBottom:14, paddingBottom:10, borderBottom:'2px solid #e2e8f0', textTransform:'uppercase', letterSpacing:'1px' },
 }
