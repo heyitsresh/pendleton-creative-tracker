@@ -15,21 +15,23 @@ export default async function handler(req, res) {
   const FIELDS = ['summary', 'status', 'assignee', 'priority', 'labels', 'updated', 'duedate', 'parent', 'issuetype']
 
   try {
-    // Atlassian deprecated POST /rest/api/3/search — use /rest/api/3/search/jql with cursor pagination
+    // Use GET /rest/api/3/search/jql (new Atlassian endpoint, cursor-based pagination)
     let all = [], nextPageToken = undefined
 
     while (true) {
-      const body = { jql: JQL, fields: FIELDS, maxResults: 100 }
-      if (nextPageToken) body.nextPageToken = nextPageToken
+      const params = new URLSearchParams({
+        jql:        JQL,
+        fields:     FIELDS.join(','),
+        maxResults: '100',
+      })
+      if (nextPageToken) params.set('nextPageToken', nextPageToken)
 
-      const r = await fetch('https://ave7.atlassian.net/rest/api/3/search/jql', {
-        method: 'POST',
+      const r = await fetch(`https://ave7.atlassian.net/rest/api/3/search/jql?${params.toString()}`, {
+        method: 'GET',
         headers: {
           'Authorization': `Basic ${auth}`,
-          'Content-Type':  'application/json',
           'Accept':        'application/json',
         },
-        body: JSON.stringify(body),
       })
 
       if (!r.ok) {
@@ -41,7 +43,6 @@ export default async function handler(req, res) {
       const page = data.issues || data.values || []
       all = all.concat(page)
 
-      // Stop if no next page or empty batch
       if (!data.nextPageToken || page.length === 0) break
       nextPageToken = data.nextPageToken
     }
