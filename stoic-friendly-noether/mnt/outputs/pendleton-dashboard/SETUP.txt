@@ -1,0 +1,101 @@
+PENDLETON DASHBOARD — SETUP GUIDE
+===================================
+
+WHAT THIS IS
+------------
+A Next.js web app that deploys on Vercel. Three tabs:
+  1. Master Catalog  — all 239 products, fully filterable, editable status/flags/notes
+  2. F26 Launches    — pending new listings + live F26 products with creative status
+  3. Creative Tracker — Inf / Copy / A+ status per product with summary cards
+
+Edits auto-save to Supabase (a free cloud database) so everyone on your team
+sees the same data when they open the URL.
+
+
+STEP 1 — Set up Supabase (free, takes 5 minutes)
+-------------------------------------------------
+1. Go to https://supabase.com and click "Start your project"
+2. Sign up with your Google account
+3. Click "New project"
+   - Name it: pendleton-dashboard
+   - Set a database password (save it somewhere)
+   - Region: US East or whichever is closest
+   - Click "Create new project" and wait ~1 minute
+
+4. Once the project is ready, go to the SQL Editor (left sidebar)
+5. Paste and run this SQL:
+
+-------- PASTE THIS IN SUPABASE SQL EDITOR --------
+CREATE TABLE pendleton_edits (
+  asin TEXT PRIMARY KEY,
+  notes TEXT DEFAULT '',
+  flag_red BOOLEAN DEFAULT FALSE,
+  flag_blue BOOLEAN DEFAULT FALSE,
+  flag_star BOOLEAN DEFAULT FALSE,
+  cr_inf TEXT DEFAULT NULL,
+  cr_copy TEXT DEFAULT NULL,
+  cr_aplus TEXT DEFAULT NULL,
+  status_override TEXT DEFAULT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE pendleton_edits ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON pendleton_edits FOR ALL USING (true) WITH CHECK (true);
+----------------------------------------------------
+
+6. Go to Project Settings → API (left sidebar)
+7. Copy two values:
+   - "Project URL" → looks like https://abcdefgh.supabase.co
+   - "anon public" key → a long string starting with "eyJ..."
+
+
+STEP 2 — Upload code to GitHub
+-------------------------------
+1. Go to your repo: https://github.com/heyitsresh/pendleton-creative-dashboard
+2. Delete ALL existing files (the old HTML file)
+3. Upload ALL files from this folder (pendleton-dashboard/) to the repo root
+   Important: the structure should be:
+     /package.json
+     /next.config.js
+     /pages/index.js
+     /pages/_app.js
+     /lib/supabase.js
+     /lib/catalogData.js
+     /styles/globals.css
+
+   (Do NOT upload .env.local.example — that's just a reference)
+
+
+STEP 3 — Add env vars to Vercel
+--------------------------------
+1. Go to your Vercel project dashboard
+2. Click Settings → Environment Variables
+3. Add these two variables:
+   Name: NEXT_PUBLIC_SUPABASE_URL
+   Value: (paste your Supabase Project URL)
+
+   Name: NEXT_PUBLIC_SUPABASE_ANON_KEY
+   Value: (paste your Supabase anon public key)
+
+4. Click Save, then go to Deployments → click "Redeploy"
+
+
+STEP 4 — Done! 🎉
+------------------
+Your dashboard will be live at:
+  https://pendleton-creative-dashboard-458r1hns3.vercel.app
+
+Share the URL with Sheila and Vannessa. Any edits they make auto-save
+and appear for everyone.
+
+
+WEEKLY REFRESH
+--------------
+When you have new ALR/Jira exports, send them to me and I'll regenerate
+the catalogData.js file. You replace that one file in GitHub and Vercel
+rebuilds automatically. All your saved notes/flags stay in Supabase.
+
+
+QUESTIONS?
+----------
+Text or message Resh — she set this up and can help troubleshoot.
